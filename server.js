@@ -1,7 +1,10 @@
+const path = require('path')
 const express = require('express')
 const app = express()
 const cors = require('cors')
-require('dotenv').config()
+require('dotenv').config({
+  path: path.join(__dirname, ".env")
+})
 
 app.use(cors())
 app.use(express.static('public'))
