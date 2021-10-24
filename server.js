@@ -13,8 +13,10 @@ const {Schema} = mongoose;
 
 mongoose.connect(process.env.MONGO_URI, {useNewUrlParser: true, useUnifiedTopology: true});
 
+/* ******* User ******* */
+
 const userSchema = new Schema({
-  username: String
+  username: {type: String, required: true}
 })
 
 const User = mongoose.model('User', userSchema);
@@ -39,9 +41,99 @@ function saveUser(name, done){
   });
   userToSave.save(function(err, user){
     if(err) return console.error(err);
-    else done(null, user);
+    else {
+      saveLog(user._id, function(err, log){
+        if(err) return console.error(err);
+        else done(null, user);
+      });
+    }
   })
 }
+
+/* ******* Exercise ******* */
+
+const exerciseSchema = new Schema({
+  userId: {type: Schema.Types.ObjectId, ref:'User', required: true},
+  description: {type: String, required: true},
+  duration: {type: Number, min: 1, required: true},
+  date: {type: Date, default: Date.now}
+})
+
+const Exercise = mongoose.model('Exercise', exerciseSchema);
+
+function saveExercise(id, desc, time, date, done){
+  let exerciseToSave;
+  if(date){
+    exerciseToSave = new Exercise({
+      userId: id,
+      description: desc, 
+      duration: time,
+      date: date
+    })
+  } else {
+    exerciseToSave = new Exercise({
+      userId: id,
+      description: desc, 
+      duration: time
+    })
+  }
+  exerciseToSave.save(function(err, exercise){
+    if(err) return console.error(err);
+    else {
+      findAndUpdateLog(exercise, id, function(err, updatedLog){
+        if(err) return console.error(err);
+        else done(null, exercise);
+      })
+    }
+  })
+}
+
+/* ******* Log ******* */
+
+const logSchema = new Schema({
+  count: {type: Number},
+  userId: {type: Schema.Types.ObjectId, ref: 'User', required: true},
+  log: [{type: Schema.Types.ObjectId, ref: 'Exercise'}]
+});
+
+const Log = mongoose.model('Log', logSchema);
+
+function findLog(id, done){
+  Log.find({userId: id}, function(err, log){
+    if(err) return console.error(err);
+    else done(null, log);
+  })
+}
+
+function saveLog(id, done){
+  const logToSave = new Log({
+    userId: id, 
+    log: [],
+    count: 0
+  })
+
+  logToSave.save(function(err, log){
+    if(err) return console.error(err);
+    else done(null, log);
+  })
+};
+
+function findAndUpdateLog(exercise, id, done){
+  Log.find({userId: id}, function(err, findedLog){
+    if(err) return console.log(err);
+    else {
+      findedLog.log.push(exercise._id);
+      findedLog.count++;
+
+      findedLog.save(function(err, updatedLog){
+        if(err) return console.error(err);
+        else done(null, updatedLog);
+      })
+    }
+  })
+}
+
+/* ************ ************ */
 
 app.use(cors())
 app.use(express.static('public'))
