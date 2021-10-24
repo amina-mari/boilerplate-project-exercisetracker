@@ -184,7 +184,7 @@ app.post("/api/users/:id/exercises", function(req, res){
     else {
       if(req.body.date){
         const dateSplitted = req.body.date.split('-');
-        const dataFormatted = new Date(dateSplitted[0], dateSplitted[1], dateSplitted[2]);
+        const dataFormatted = new Date(dateSplitted[0], (dateSplitted[1] - 1), dateSplitted[2]);
         if(Date.parse(dataFormatted)){
           saveExercise(req.params.id, 
             req.body.description, 
