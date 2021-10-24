@@ -61,6 +61,15 @@ const exerciseSchema = new Schema({
 
 const Exercise = mongoose.model('Exercise', exerciseSchema);
 
+function findUserByExercise(exerciseId, done){
+  Exercise.findOne({_id: exerciseId})
+    .populate('userId')
+    .exec(function(err, exercise){
+      if(err) return console.error(err);
+      else done(null, exercise);
+    })
+}
+
 function saveExercise(id, desc, time, date, done){
   let exerciseToSave;
   if(date){
@@ -119,7 +128,7 @@ function saveLog(id, done){
 };
 
 function findAndUpdateLog(exercise, id, done){
-  Log.find({userId: id}, function(err, findedLog){
+  Log.findOne({userId: id}, function(err, findedLog){
     if(err) return console.log(err);
     else {
       findedLog.log.push(exercise._id);
@@ -157,7 +166,69 @@ app.route("/api/users")
     })
   })
 
-
+app.post("/api/users/:id/exercises", function(req, res){
+  findUser(req.params.id, function(err, user){
+    if(err) {
+      res.json({"error": "user not found"});
+      return console.error(err);
+    }
+    else {
+      if(req.body.date){
+        const dateSplitted = req.body.date.split('-');
+        const dataFormatted = new Date(dateSplitted[0], dateSplitted[1], dateSplitted[2]);
+        if(Date.parse(dataFormatted)){
+          saveExercise(req.params.id, 
+            req.body.description, 
+            req.body.duration, 
+            dataFormatted, 
+            function(err, exercise){
+              if(err) return console.error(err);
+              else {
+                let username;
+                findUserByExercise(exercise._id, function(err, findedExercise){
+                  if(err) return console.error(err);
+                  else {
+                    username = findedExercise.userId.username;
+                    res.json({
+                      "_id": exercise.userId,
+                      "username": username,
+                      "date": exercise.date.toDateString(),
+                      "duration": exercise.duration,
+                      "description": exercise.description
+                    })
+                  } 
+                });
+              }
+            });
+        } else res.json({"error": "invalid date"});
+      } else {
+        saveExercise(req.params.id, 
+          req.body.description, 
+          req.body.duration, 
+          null, 
+          function(err, exercise){
+            if(err) return console.error(err);
+            else {
+              let username;
+              findUserByExercise(exercise._id, function(err, findedExercise){
+                if(err) return console.error(err);
+                else {
+                  username = findedExercise.userId.username;
+                  res.json({
+                    "_id": exercise.userId,
+                    "username": username,
+                    "date": exercise.date.toDateString(),
+                    "duration": exercise.duration,
+                    "description": exercise.description
+                  })
+                } 
+              });
+            }
+          });
+      }
+    }
+  })
+})
 
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log('Your app is listening on port ' + listener.address().port)
