@@ -26,6 +26,13 @@ function findUser(id, done){
   })
 }
 
+function findAllUsers(done){
+  User.find({}, function(err, users){
+    if(err) return console.error(err);
+    else done(null, users);
+  })
+}
+
 function saveUser(name, done){
   const userToSave = new User({
     username: name
@@ -44,9 +51,19 @@ app.get('/', (req, res) => {
 });
 
 
-app.post("/api/users", function(req, res){
-  res.json({"ok": req.body.username})
-})
+app.route("/api/users")
+  .post(function(req, res){
+    saveUser(req.body.username, function(err, user){
+      if(err) return console.error(err);
+      else res.json({"username": user.username, "_id": user._id});
+    })
+  })
+  .get(function(req, res){
+    findAllUsers(function(err, users){
+      if(err) return console.error(err);
+      else res.json(users);
+    })
+  })
 
 
 
