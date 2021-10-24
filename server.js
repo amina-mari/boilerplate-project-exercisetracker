@@ -56,7 +56,7 @@ const exerciseSchema = new Schema({
   userId: {type: Schema.Types.ObjectId, ref:'User', required: true},
   description: {type: String, required: true},
   duration: {type: Number, min: 1, required: true},
-  date: {type: Date, default: Date.now}
+  date: {type: String}
 })
 
 const Exercise = mongoose.model('Exercise', exerciseSchema);
@@ -77,13 +77,16 @@ function saveExercise(id, desc, time, date, done){
       userId: id,
       description: desc, 
       duration: time,
-      date: date
+      date: date.toDateString()
     })
   } else {
+    let dateNow = new Date(Date.now()).toDateString();
+    
     exerciseToSave = new Exercise({
       userId: id,
       description: desc, 
-      duration: time
+      duration: time,
+      date: dateNow
     })
   }
   exerciseToSave.save(function(err, exercise){
@@ -108,10 +111,16 @@ const logSchema = new Schema({
 const Log = mongoose.model('Log', logSchema);
 
 function findLog(id, done){
-  Log.find({userId: id}, function(err, log){
-    if(err) return console.error(err);
-    else done(null, log);
-  })
+  Log.findOne({userId: id})
+    .populate('userId')
+    .populate({
+      path: 'log',
+      select: '-_id -userId -__v'
+    })
+    .exec(function(err, log){
+      if(err) return console.error(err);
+      else done(null, log);
+    });
 }
 
 function saveLog(id, done){
@@ -192,7 +201,7 @@ app.post("/api/users/:id/exercises", function(req, res){
                     res.json({
                       "_id": exercise.userId,
                       "username": username,
-                      "date": exercise.date.toDateString(),
+                      "date": exercise.date,
                       "duration": exercise.duration,
                       "description": exercise.description
                     })
@@ -217,7 +226,7 @@ app.post("/api/users/:id/exercises", function(req, res){
                   res.json({
                     "_id": exercise.userId,
                     "username": username,
-                    "date": exercise.date.toDateString(),
+                    "date": exercise.date,
                     "duration": exercise.duration,
                     "description": exercise.description
                   })
@@ -226,6 +235,22 @@ app.post("/api/users/:id/exercises", function(req, res){
             }
           });
       }
+    }
+  })
+})
+
+app.get("/api/users/:id/logs", function(req, res){
+  findLog(req.params.id, function(err, log){
+    if(err) {
+      res.json({"error": "user not found"});
+      return console.error(err);
+    } else {
+      res.json({
+        "_id": log.userId._id,
+        "username": log.userId.username,
+        "count": log.count,
+        "log": log.log
+      });
     }
   })
 })
