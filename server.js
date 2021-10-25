@@ -56,7 +56,8 @@ const exerciseSchema = new Schema({
   userId: {type: Schema.Types.ObjectId, ref:'User', required: true},
   description: {type: String, required: true},
   duration: {type: Number, min: 1, required: true},
-  date: {type: String}
+  date: {type: String},
+  dateObject: {type: Date}
 })
 
 const Exercise = mongoose.model('Exercise', exerciseSchema);
@@ -77,16 +78,19 @@ function saveExercise(id, desc, time, date, done){
       userId: id,
       description: desc, 
       duration: time,
-      date: date.toDateString()
+      date: date.toDateString(),
+      dateObject: date
     })
   } else {
-    let dateNow = new Date(Date.now()).toDateString();
+    let dateNow = new Date(Date.now());
+    let dateNowString = dateNow.toDateString();
     
     exerciseToSave = new Exercise({
       userId: id,
       description: desc, 
       duration: time,
-      date: dateNow
+      date: dateNowString,
+      dateObject: dateNow
     })
   }
   exerciseToSave.save(function(err, exercise){
@@ -110,12 +114,79 @@ const logSchema = new Schema({
 
 const Log = mongoose.model('Log', logSchema);
 
+function filterLog(from, to, lim, id, done){
+  let limit;
+  let dateFrom;
+  let dateTo;
+
+  if(!lim) limit = 0;
+  if(from && to){
+    Log.findOne({userId: id})
+      .populate({
+        path: 'log',
+        match: {
+          dateObject: {
+            $gte: from,
+            $lt: to
+          }
+        },
+        options: {
+          limit: lim
+        },
+        select: '-_id -userId -__v -dateObject'
+      })
+      .populate('userId')
+      .exec(function(err, log){
+        if(err) return console.error(err);
+        else return done(null, log);
+      })
+  } else if(from) {
+    Log.findOne({userId: id})
+      .populate({
+        path: 'log',
+        match: {
+          dateObject: {
+            $gte: from
+          }
+        },
+        options: {
+          limit: lim
+        },
+        select: '-_id -userId -__v -dateObject'
+      })
+      .populate('userId')
+      .exec(function(err, logs){
+        if(err) return console.error(err);
+        else return done(null, logs);
+      })
+  } else if(to){
+    Log.findOne({userId: id})
+      .populate({
+        path: 'log',
+        match: {
+          dateObject: {
+            $lt: to
+          }
+        },
+        options: {
+          limit: lim
+        },
+        select: '-_id -userId -__v -dateObject'
+      })
+      .populate('userId')
+      .exec(function(err, log){
+        if(err) return console.error(err);
+        else return done(null, log);
+      })
+  }
+}
+
 function findLog(id, done){
   Log.findOne({userId: id})
     .populate('userId')
     .populate({
       path: 'log',
-      select: '-_id -userId -__v'
+      select: '-_id -userId -__v -dateObject'
     })
     .exec(function(err, log){
       if(err) return console.error(err);
@@ -152,6 +223,27 @@ function findAndUpdateLog(exercise, id, done){
 }
 
 /* ************ ************ */
+
+function checkQueryParams(from, to, lim){
+  let dateFrom = new Date(2000, 01, 01);
+  let dateTo = new Date(2000, 01, 01);
+  let limit = 1;
+
+  if(from){
+    const dateFromSplitted = from.split('-');
+    dateFrom = new Date(dateFromSplitted[0], (dateFromSplitted[1] - 1), dateFromSplitted[2]);
+  }
+  if(to){
+    const dateToSplitted = to.split('-');
+    dateTo = new Date(dateToSplitted[0], (dateToSplitted[1] - 1), dateToSplitted[2]);
+  }
+  if(lim){
+    limit = lim;
+  }
+
+  if(Date.parse(dateFrom) && Date.parse(dateTo) && (limit % 1 === 0)) return true;
+  else return false;
+}
 
 app.use(cors())
 app.use(express.static('public'))
@@ -240,19 +332,40 @@ app.post("/api/users/:id/exercises", function(req, res){
 })
 
 app.get("/api/users/:id/logs", function(req, res){
-  findLog(req.params.id, function(err, log){
-    if(err) {
-      res.json({"error": "user not found"});
-      return console.error(err);
+  if(!(req.query.from) && !(req.query.to) && !(req.query.limit)){
+    findLog(req.params.id, function(err, log){
+      if(err) {
+        res.json({"error": "user not found"});
+        return console.error(err);
+      } else {
+        res.json({
+          "_id": log.userId._id,
+          "username": log.userId.username,
+          "count": log.count,
+          "log": log.log
+        });
+      }
+    })
+  } else {
+    if(checkQueryParams(req.query.from, req.query.to, req.query.limit)){
+      filterLog(req.query.from, req.query.to, req.query.limit, req.params.id, function(err, log){
+        if(err) {
+          res.json({"error": "something go wrong"});
+          return console.error(err);
+        }
+        else {
+          res.json({
+            "_id": log.userId._id,
+            "username": log.userId.username,
+            "count": log.count,
+            "log": log.log
+          });
+        }
+      })
     } else {
-      res.json({
-        "_id": log.userId._id,
-        "username": log.userId.username,
-        "count": log.count,
-        "log": log.log
-      });
+      res.json({"error": "invalid query parameters"});
     }
-  })
+  }
 })
 
 const listener = app.listen(process.env.PORT || 3000, () => {
