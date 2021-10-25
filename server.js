@@ -371,11 +371,6 @@ app.get("/api/users/:id/logs", function(req, res){
             json["to"] = dateTo.toDateString();
           }
 
-          if(req.query.limit){
-            const limit = req.query.limit;
-            json["limit"] = limit;
-          }
-
           json["count"] = log.log.length;
           json["log"] = log.log;
 
