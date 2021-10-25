@@ -354,12 +354,32 @@ app.get("/api/users/:id/logs", function(req, res){
           return console.error(err);
         }
         else {
-          res.json({
+          const json = {
             "_id": log.userId._id,
-            "username": log.userId.username,
-            "count": log.count,
-            "log": log.log
-          });
+            "username": log.userId.username
+          }
+
+          if(req.query.from){
+            const dateFromSplitted = (req.query.from).split('-');
+            let dateFrom = new Date(dateFromSplitted[0], (dateFromSplitted[1] - 1), dateFromSplitted[2]);
+            json["from"] = dateFrom.toDateString();
+          }
+
+          if(req.query.to){
+            const dateToSplitted = (req.query.to).split('-');
+            let dateTo = new Date(dateToSplitted[0], (dateToSplitted[1] - 1), dateToSplitted[2]);
+            json["to"] = dateTo.toDateString();
+          }
+
+          if(req.query.limit){
+            const limit = req.query.limit;
+            json["limit"] = limit;
+          }
+
+          json["count"] = log.log.length;
+          json["log"] = log.log;
+
+          res.json(json);
         }
       })
     } else {
