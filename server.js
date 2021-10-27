@@ -179,6 +179,21 @@ function filterLog(from, to, lim, id, done){
         else return done(null, log);
       })
   }
+  else if(lim){
+    Log.findOne({userId: id})
+      .populate({
+        path: 'log',
+        options: {
+          limit: lim
+        },
+        select: '-_id -userId -__v -dateObject'
+      })
+      .populate('userId')
+      .exec(function(err, log){
+        if(err) return console.error(err);
+        else return done(null, log);
+      })
+  }
 }
 
 function findLog(id, done){
